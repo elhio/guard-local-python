@@ -1,0 +1,21 @@
+[project]
+name = "guard-local-detector"
+version = "0.1.0"
+description = "A seamless local detection engine for the Guard Python client, integrating visual safety filters into your applications"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.24.4",
+    "onnxruntime>=1.20.1",
+    "pillow>=10.4.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.6.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
