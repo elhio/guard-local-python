@@ -42,3 +42,8 @@ test-results/
 junit.xml
 .tox/
 .nox/
+
+# build artefacts
+dist/
+build/
+*.egg-info/

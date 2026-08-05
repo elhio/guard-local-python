@@ -3,17 +3,17 @@
     <img src="./docs/assets/guard.svg" width="100" alt="Guard Logo"><br>
     Guard Local Detector
   </h1>
-  <p><em>A seamless local detection engine for the Guard Python client, integrating visual safety filters into your applications</em></p>
+  <p><em>A local detection engine for the Guard Python client, integrating visual safety filters into your applications</em></p>
   <p>
     <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg" alt="License: AGPL v3"></a>
-    <a href="https://github.com/elhio/guard-browser-extension/fork"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>  
+    <a href="https://github.com/elhio/guard-local-python/fork"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>  
   </p>
 </div>
 
 ## Features
 
-**🛡️ Multi-Layered Content Moderation:** Automatically detects AI-generated, violent, and explicit content within 
-images.
+**🛡️ Multi-Layered Content Moderation:** Automatically detects AI-generated, violent, and explicit content in images and 
+videos.
 
 **⚡ Fast Local Inference:** Runs a lightweight computer vision model entirely on-device using ONNX Runtime. It operates 
 with zero network latency and completely avoids pulling in massive deep-learning dependencies like PyTorch.
@@ -46,30 +46,39 @@ pip install guard-local-detector
 
 ### Using the Unified Client (Recommended)
 
-If you installed via `guard-client[local]`, you do not need to import this package directly. The main client will 
-automatically detect its presence and route local file checks to this engine.
+If you installed via `guard-client[local]`, you do not need to import this package directly. Ask the client for the 
+local engine and it routes every call here — no API key, and no network access.
 
 ```python
 from guard_client import GuardClient
 
-client = GuardClient(api_key="your_api_key_here")
+with GuardClient(engine="local") as client:
+    result = client.analyze("/local/paths/to/video.mp4")
 
-# URL provided: automatically routed to the local engine
-cloud_result = client.check_media(url="[https://example.com/video.mp4](https://example.com/video.mp4)")
-
-# File path provided: Automatically routed to the local AGPL engine
-local_result = client.check_media(file_path="/local/paths/to/video.mp4")
+    for item in result.results:
+        print(f"{item.label}: {item.score}")  # AI-Generated: 71
 ```
 
+The results carry the same labels, task ids, and 0-100 scores a cloud run returns, so the same code works against 
+either engine. A cloud-configured client can also send a single call locally with `client.analyze(source, 
+engine="local")`.
+
 ### Using the Standalone Engine
+
+The engine works on bytes and a MIME type, never a path — reading the source is the caller's job.
 
 ```python
 import guard_local
 
-# Run the media detection locally on your hardware
-result = guard_local.analyze_file("/local/paths/to/video.mp4")
+engine = guard_local.LocalDetectorEngine()
 
-print(f"Detection Results: {result}")
+with open("/local/paths/to/video.mp4", "rb") as handle:
+    results = engine.analyze(handle.read(), "video/mp4")
+
+print(results)
+# [{'label': 'AI-Generated', 'score': 0.71, 'description': 'Detect AI-generated or manipulated media'},
+#  {'label': 'Violence', 'score': 0.01, 'description': 'Detect violent media'},
+#  {'label': 'Explicit', 'score': 0.01, 'description': 'Detect sexually explicit media'}]
 ```
 
 ## Development
@@ -100,10 +109,11 @@ This project uses [uv](https://docs.astral.sh/uv/) for lightning-fast Python pac
     uv run pytest
     ```
 
-4. Formatting and linting:
+4. Formatting, linting, and type checking:
     ```bash
     uv run ruff format
     uv run ruff check
+    uv run mypy
     ```
 
 5. Build for production:
