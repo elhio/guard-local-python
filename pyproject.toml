@@ -59,6 +59,10 @@ dev = [
     "ruff>=0.6.0",
     "mypy>=1.11.0",
 ]
+docs = [
+    "griffe>=2.0.0",
+    "tomli>=2.0.0; python_version < '3.11'",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -99,6 +103,7 @@ convention = "google"
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D"]
 "tests/test_contract.py" = ["D", "E501", "SIM105"]
+"scripts/**" = ["D101", "D102", "D103", "D107"]
 
 [tool.mypy]
 packages = ["guard_local"]
