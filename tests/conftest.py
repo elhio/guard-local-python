@@ -76,6 +76,54 @@ def exif_rotated_jpeg() -> bytes:
     return encode(gradient(64, 32), "JPEG", exif=exif)
 
 
+def tagged_jpeg(**tags: object) -> bytes:
+    """
+    Create a JPEG carrying the given EXIF tags, keyed by tag number.
+
+    Tag numbers rather than names, because that is what Pillow writes: 0x010F Make,
+    0x0110 Model, 0x0131 Software, 0x829D FNumber, 0x9286 UserComment.
+    """
+    exif = Image.Exif()
+    for tag, value in tags.items():
+        exif[int(tag, 16)] = value
+    return encode(gradient(), "JPEG", exif=exif)
+
+
+def png_with_text(**chunks: str) -> bytes:
+    """Create a PNG carrying the given tEXt chunks, as diffusion tools write them."""
+    from PIL import PngImagePlugin
+
+    info = PngImagePlugin.PngInfo()
+    for keyword, text in chunks.items():
+        info.add_text(keyword, text)
+    return encode(gradient(), "PNG", pnginfo=info)
+
+
+def xmp_jpeg(packet: str) -> bytes:
+    """Create a JPEG carrying a raw XMP packet."""
+    return encode(gradient(), "JPEG", xmp=packet.encode("utf-8"))
+
+
+def manifest_store(active: str, **manifests: object) -> dict:
+    """
+    Build a manifest store of the shape the C2PA reader returns.
+
+    The detectors are pure functions over parsed JSON, so a hand-written store tests
+    them exactly as a signed asset would, without needing a certificate.
+    """
+    return {"active_manifest": active, "manifests": dict(manifests)}
+
+
+def manifest(label: str, actions: list = None, **fields: object) -> dict:
+    """Build one manifest, wrapping `actions` in the assertion that carries them."""
+    built = {"label": label, **fields}
+    if actions is not None:
+        built.setdefault("assertions", []).append(
+            {"label": "c2pa.actions.v2", "data": {"actions": actions}}
+        )
+    return built
+
+
 def video_bytes(
     container_format: str = "mp4",
     codec: str = "libx264",

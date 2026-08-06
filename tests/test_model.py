@@ -1,5 +1,5 @@
 """
-Decodes media bytes and transforms them for the model.
+The model source: decoding, the transform, the session, and the scores.
 
 The transform is asserted geometrically rather than by eye. It must match the exact
 transform the browser extension runs against the same ONNX file. Every step of this
@@ -15,8 +15,21 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from guard_local.exceptions import MediaDecodeError, UnsupportedMediaError
-from guard_local.media_utils import IMAGE_SIZE, letterbox, load_frames, to_tensor
+from guard_local.detection import CATEGORIES, CategoryResult
+from guard_local.exceptions import (
+    MediaDecodeError,
+    ModelLoadError,
+    UnsupportedMediaError,
+)
+from guard_local.sources.model import (
+    IMAGE_SIZE,
+    ModelSession,
+    ModelSource,
+    letterbox,
+    load_frames,
+    to_tensor,
+)
+from guard_local.sources.model.source import _sigmoid
 
 from .conftest import (
     exif_rotated_jpeg,
@@ -40,7 +53,9 @@ from .conftest import (
         (heic_bytes(), "image/heic"),
     ],
 )
-def test_every_still_format_decodes_to_one_rgb_frame(data: bytes, media_type: str) -> None:
+def test_every_still_format_decodes_to_one_rgb_frame(
+    data: bytes, media_type: str
+) -> None:
     frames = load_frames(data, media_type)
 
     assert len(frames) == 1
@@ -48,7 +63,7 @@ def test_every_still_format_decodes_to_one_rgb_frame(data: bytes, media_type: st
 
 
 def test_animated_gif_yields_its_first_frame() -> None:
-    """Ensure animated GIFs yield only their first frame to match the browser extension."""
+    """Ensure animated GIFs yield only their first frame, as the extension does."""
     (frame,) = load_frames(gif_bytes(), "image/gif")
 
     assert frame.getpixel((0, 0)) == (255, 0, 0)
@@ -120,7 +135,7 @@ class TestLetterbox:
 
         top = (IMAGE_SIZE - 64) // 2
         # Every padded row above the image equals its first row, exactly.
-        assert np.array_equal(canvas[:top], np.repeat(canvas[top: top + 1], top, 0))
+        assert np.array_equal(canvas[:top], np.repeat(canvas[top : top + 1], top, 0))
         assert not np.array_equal(canvas[0], np.zeros_like(canvas[0]))
 
     def test_the_image_is_centred(self) -> None:
@@ -214,3 +229,118 @@ class TestVideoFrames:
 
     def test_a_single_frame_request_is_honoured(self, mp4: Any) -> None:
         assert len(load_frames(mp4, "video/mp4", max_frames=1)) == 1
+
+
+class TestSessionResolution:
+    def test_the_bundled_model_is_used_by_default(self, monkeypatch: Any) -> None:
+        monkeypatch.delenv("GUARD_LOCAL_MODEL_PATH", raising=False)
+
+        path = ModelSession().resolve_path()
+
+        assert path.endswith("model_fp16.onnx")
+        assert "guard_local" in path
+
+    def test_the_environment_variable_is_honoured(self, monkeypatch: Any) -> None:
+        """Ensure standalone users get the same configuration knob the client uses."""
+        bundled = ModelSession()._bundled_model_path()
+        monkeypatch.setenv("GUARD_LOCAL_MODEL_PATH", bundled)
+
+        assert ModelSession().resolve_path() == bundled
+
+    def test_the_explicit_argument_wins_over_the_environment(
+        self, monkeypatch: Any, tmp_path: Any
+    ) -> None:
+        bundled = ModelSession()._bundled_model_path()
+        monkeypatch.setenv("GUARD_LOCAL_MODEL_PATH", str(tmp_path / "ignored.onnx"))
+
+        assert ModelSession(bundled).resolve_path() == bundled
+
+    def test_a_directory_resolves_to_the_model_inside_it(self) -> None:
+        import os
+
+        bundled = ModelSession()._bundled_model_path()
+        model_dir = os.path.dirname(os.path.dirname(bundled))
+
+        assert ModelSession(model_dir).resolve_path() == bundled
+
+    def test_a_missing_environment_path_names_where_it_came_from(
+        self, monkeypatch: Any, tmp_path: Any
+    ) -> None:
+        monkeypatch.setenv("GUARD_LOCAL_MODEL_PATH", str(tmp_path / "absent.onnx"))
+
+        with pytest.raises(ModelLoadError, match=r"\$GUARD_LOCAL_MODEL_PATH"):
+            ModelSession().resolve_path()
+
+    def test_the_session_is_built_once_and_reused(self) -> None:
+        session = ModelSession()
+
+        first, name = session.ensure()
+
+        assert session.ensure() == (first, name)
+        assert session._session is first
+
+
+class TestModelSource:
+    def test_reports_every_category(self) -> None:
+        """The model is the only source that always has an opinion on all three."""
+        found = ModelSource().analyze(png_bytes(), "image/png")
+
+        assert set(found) == set(CATEGORIES)
+        assert all(isinstance(result, CategoryResult) for result in found.values())
+
+    def test_every_result_carries_exactly_one_match_naming_the_model(self) -> None:
+        found = ModelSource().analyze(png_bytes(), "image/png")
+
+        for category, result in found.items():
+            assert [match.source for match in result.matches] == ["model"]
+            assert result.matches[0].category == category
+
+    def test_the_result_keeps_more_precision_than_its_match(self) -> None:
+        """
+        The match rounds for display; the result must not.
+
+        This is the deliberate refinement over the browser extension, which rounds the
+        model to a whole percent before weighing it against the other sources.
+        """
+        found = ModelSource().analyze(jpeg_bytes(64, 48), "image/jpeg")
+        result = found["aiGenerated"]
+
+        assert result.confidence == pytest.approx(25.7501, abs=1e-3)
+        assert result.matches[0].confidence == 26
+
+    def test_a_confident_score_and_a_quiet_one_point_opposite_ways(self) -> None:
+        found = ModelSource().analyze(jpeg_bytes(64, 48), "image/jpeg")
+
+        assert found["aiGenerated"].matches[0].kind == "authentic"
+        assert found["violent"].matches[0].kind == "safe"
+
+    def test_max_aggregation_reports_the_worst_frame(self, mp4: Any) -> None:
+        worst = ModelSource(video_aggregate="max").analyze(mp4, "video/mp4")
+        averaged = ModelSource(video_aggregate="mean").analyze(mp4, "video/mp4")
+
+        assert worst["aiGenerated"].confidence >= averaged["aiGenerated"].confidence
+
+    def test_stills_are_never_sampled_as_clips(self, monkeypatch: Any) -> None:
+        seen: list[int] = []
+
+        def spy(data: bytes, media_type: str, *, max_frames: int) -> Any:
+            seen.append(max_frames)
+            return [Image.new("RGB", (8, 8))]
+
+        monkeypatch.setattr("guard_local.sources.model.source.load_frames", spy)
+        ModelSource(video_frames=16).analyze(png_bytes(), "image/png")
+
+        assert seen == [1]
+
+
+class TestSigmoid:
+    @pytest.mark.parametrize(
+        ("logit", "expected"),
+        [(0.0, 0.5), (-4.310639, 0.0132471), (2.0, 0.8807971)],
+    )
+    def test_matches_the_logistic_function(self, logit: float, expected: float) -> None:
+        assert _sigmoid(logit) == pytest.approx(expected, abs=1e-5)
+
+    def test_does_not_overflow_on_extreme_logits(self) -> None:
+        assert _sigmoid(-1000.0) == pytest.approx(0.0)
+        assert _sigmoid(1000.0) == pytest.approx(1.0)

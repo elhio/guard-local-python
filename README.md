@@ -1,6 +1,6 @@
 <div align="center">
   <h1>
-    <img src="./docs/assets/guard.svg" width="100" alt="Guard Logo"><br>
+    <img src="./docs/guard.svg" width="100" alt="Guard Logo"><br>
     Guard Local Detector
   </h1>
   <p><em>A local detection engine for the Guard Python client, integrating visual safety filters into your applications</em></p>
@@ -72,13 +72,15 @@ import guard_local
 
 engine = guard_local.LocalDetectorEngine()
 
-with open("/local/paths/to/video.mp4", "rb") as handle:
-    results = engine.analyze(handle.read(), "video/mp4")
+with open("/local/paths/to/image.png", "rb") as handle:
+    results = engine.analyze(handle.read(), "image/png")
+    
+for item in results:
+    print(f"{item['label']}: {item['score']:.2f}")
 
-print(results)
-# [{'label': 'AI-Generated', 'score': 0.71, 'description': 'Detect AI-generated or manipulated media'},
-#  {'label': 'Violence', 'score': 0.01, 'description': 'Detect violent media'},
-#  {'label': 'Explicit', 'score': 0.01, 'description': 'Detect sexually explicit media'}]
+# AI-Generated: 0.90
+# Violence: 0.02
+# Explicit: 0.01
 ```
 
 ## Development

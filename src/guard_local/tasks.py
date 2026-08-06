@@ -13,6 +13,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import FrozenSet, Tuple
 
+from .detection import AI_GENERATED, EXPLICIT, VIOLENT
+
 __all__ = [
     "IMAGE_MEDIA_TYPES",
     "SUPPORTED_MEDIA_TYPES",
@@ -31,11 +33,16 @@ class Task:
         label: The plain text detection name and the seed used for the task ID.
         description: The detailed explanation returned by the cloud API.
         output: The name of the ONNX graph output carrying the logit for this head.
+        category: The detection category this task reports, matched to the naming
+            convention of the metadata and C2PA layers. This is the only place
+            where the vocabulary of the cloud API and the signal vocabulary are
+            tied together.
     """
 
     label: str
     description: str
     output: str
+    category: str
 
 
 #: The three heads in the exact order results are always reported.
@@ -44,16 +51,19 @@ TASKS: Tuple[Task, ...] = (
         label="AI-Generated",
         description="Detect AI-generated or manipulated media",
         output="out_ai",
+        category=AI_GENERATED,
     ),
     Task(
         label="Violence",
         description="Detect violent media",
         output="out_violence",
+        category=VIOLENT,
     ),
     Task(
         label="Explicit",
         description="Detect sexually explicit media",
         output="out_nsfw",
+        category=EXPLICIT,
     ),
 )
 

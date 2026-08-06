@@ -1,19 +1,13 @@
 """
-Decodes media bytes and converts them into the tensor the model expects.
+Decodes media bytes into the frames the model scores.
 
 The engine receives only a buffer and a MIME type instead of a path or filename. Because
-of this, all operations here work directly from `bytes`.
-
-The transform is not a simple resize. It accurately reproduces the exact steps the model
-was trained with. This is also the same pipeline the Guard browser extension uses
-against the identical ONNX file. Scores are only comparable if the input pixels are
-processed exactly as follows:
-
-1. EXIF rotated and converted to RGB, with alpha dropped instead of composited.
-2. Scaled so the longest edge is 256, truncating the shorter edge with `int()`.
-3. Centered on a 256x256 canvas where padding replicates the nearest edge pixel.
-4. Rescaled to a 0-1 range, normalized with ImageNet statistics, and laid
-   out as NCHW `float32`.
+of this, all operations here work directly from bytes. This logic lives under the model
+source because the model is the only component that requires pixel data. The provenance
+and metadata sources read the same buffer without ever decoding it. This is why a
+metadata-only engine executes in milliseconds. Frames leave this module EXIF-rotated and
+converted to RGB. Alpha channels are dropped rather than composited, which represents
+the first of the four steps documented in the transform module.
 """
 
 from __future__ import annotations
@@ -22,27 +16,28 @@ import contextlib
 import io
 from typing import Any, List, Optional
 
-import numpy as np
 import pillow_heif
 from PIL import Image, ImageOps
 
-from .exceptions import GuardLocalError, MediaDecodeError, UnsupportedMediaError
-from .models import IMAGE_MEDIA_TYPES, SUPPORTED_MEDIA_TYPES, VIDEO_MEDIA_TYPES
+from guard_local.exceptions import (
+    GuardLocalError,
+    MediaDecodeError,
+    UnsupportedMediaError,
+)
+from guard_local.tasks import (
+    IMAGE_MEDIA_TYPES,
+    SUPPORTED_MEDIA_TYPES,
+    VIDEO_MEDIA_TYPES,
+)
 
-__all__ = ["IMAGE_SIZE", "letterbox", "load_frames", "to_tensor"]
+__all__ = ["load_frames"]
 
-#: The fixed spatial input size of the model in pixels.
-IMAGE_SIZE = 256
-
-_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-
-# A clip whose container reports no duration has to be walked frame by frame. Cap that
-# walk so a long or malformed stream cannot turn one call into an unbounded decode.
+# A clip whose container reports no duration must be walked frame by frame. We cap
+# that walk so a long or malformed stream cannot turn one call into an unbounded decode.
 _MAX_SEQUENTIAL_FRAMES = 900
 
-# Pillow cannot decode HEIC unaided. Registering the opener here means HEIC then flows
-# through exactly the same still image path as everything else.
+# Pillow cannot decode HEIC unaided. Registering the opener here ensures HEIC
+# flows through exactly the same still image path as everything else.
 pillow_heif.register_heif_opener()
 
 
@@ -54,17 +49,19 @@ def load_frames(
 
     Args:
         data: The raw media bytes.
-        media_type: The MIME type of the media. Must be one of the supported types.
+        media_type: The MIME type of the media. This must be one of the
+            supported types.
         max_frames: How many frames to sample from a video. This is ignored
-            for still images, which always yield exactly one frame.
+            for still images which always yield exactly one frame.
 
     Returns:
-        One RGB image for a still image, or up to `max_frames` images for a video.
+        A list containing one RGB image for a still image, or up to
+        `max_frames` images for a video.
 
     Raises:
         UnsupportedMediaError: If the media type is not supported by the engine.
-        MediaDecodeError: If the bytes could not be decoded or a video yielded
-            no frames.
+        MediaDecodeError: If the bytes could not be decoded or if a video
+            yielded no frames.
     """
     if media_type in IMAGE_MEDIA_TYPES:
         return [_load_image(data)]
@@ -77,67 +74,6 @@ def load_frames(
     )
 
 
-def letterbox(image: Image.Image, size: int = IMAGE_SIZE) -> np.ndarray:
-    """
-    Fit an image into a square canvas without distorting it.
-
-    The longest edge is scaled to `size` and the shorter one is truncated
-    using `int()`. This matches the rounding behavior of the training transform,
-    which is often one pixel off from a standard `round()` operation. The
-    remaining space is padded by replicating the nearest edge pixel. This
-    ensures the border contains no color that the image did not already have.
-
-    Args:
-        image: An RGB image.
-        size: The edge length of the output canvas.
-
-    Returns:
-        A `uint8` array of shape `(size, size, 3)`.
-    """
-    width, height = image.size
-    scale = size / max(width, height)
-    scaled_width = max(1, int(width * scale))
-    scaled_height = max(1, int(height * scale))
-
-    resized = image.resize(
-        (scaled_width, scaled_height), resample=Image.Resampling.BICUBIC
-    )
-    pixels = np.asarray(resized, dtype=np.uint8)
-    if scaled_width == size and scaled_height == size:
-        return pixels
-
-    left = (size - scaled_width) // 2
-    top = (size - scaled_height) // 2
-    return np.pad(
-        pixels,
-        (
-            (top, size - scaled_height - top),
-            (left, size - scaled_width - left),
-            (0, 0),
-        ),
-        mode="edge",
-    )
-
-
-def to_tensor(image: Image.Image, size: int = IMAGE_SIZE) -> np.ndarray:
-    """
-    Turn an image into the input tensor required by the model.
-
-    Args:
-        image: An RGB image.
-        size: The edge length of the model's square input.
-
-    Returns:
-        A `float32` array of shape `(1, 3, size, size)`. The data type is
-        critical here. Numpy would silently promote the entire tensor to
-        `float64` if the normalization constants were not also explicitly
-        `float32`, which the ONNX runtime would reject.
-    """
-    pixels = letterbox(image, size).astype(np.float32) / np.float32(255.0)
-    pixels = (pixels - _MEAN) / _STD
-    return np.expand_dims(pixels.transpose(2, 0, 1), axis=0)
-
-
 def _load_image(data: bytes) -> Image.Image:
     """
     Decode a still image.
@@ -146,7 +82,7 @@ def _load_image(data: bytes) -> Image.Image:
         data: The raw image bytes.
 
     Returns:
-        The first frame, EXIF-rotated and converted to RGB.
+        The first frame EXIF-rotated and converted to RGB.
 
     Raises:
         MediaDecodeError: If the bytes do not represent a decodable image.
@@ -167,7 +103,7 @@ def _load_video_frames(data: bytes, *, max_frames: int) -> List[Image.Image]:
     """
     Sample frames evenly across a video clip.
 
-    PyAV opens a file object directly from the buffer, which means the clip is demuxed
+    PyAV opens a file object directly from the buffer. This means the clip is demuxed
     without ever writing anything to the disk.
 
     Args:
@@ -176,7 +112,7 @@ def _load_video_frames(data: bytes, *, max_frames: int) -> List[Image.Image]:
 
     Returns:
         Up to `max_frames` RGB images in presentation order. A clip shorter than the
-            requested sample count will yield fewer frames.
+        requested sample count will yield fewer frames.
 
     Raises:
         MediaDecodeError: If the clip could not be demuxed, carries no video stream, or
@@ -214,17 +150,16 @@ def _seek_frames(container: Any, stream: Any, max_frames: int) -> List[Image.Ima
     """
     Sample at evenly spaced timestamps in a single forward pass.
 
-    Targets sit at the midpoint of each of the `max_frames` equal slices.
-    This keeps the sample away from the leading and trailing frames, which
-    are often black or letterboxed title cards that do not accurately represent
-    the main content of the clip.
+    Targets sit at the midpoint of each of the `max_frames` equal slices. This keeps the
+    sample away from the leading and trailing frames. Those are often black or
+    letterboxed title cards that do not accurately represent the main content of the
+    clip.
 
-    Seeking only moves backward. It lands on the keyframe preceding a target,
-    so the target frame itself must be reached by decoding forward. Because
-    the targets ascend chronologically, one seek to the first target followed
-    by a continuous forward walk will reach all of them. This is much faster
-    than seeking per target, which would repeatedly decode the same keyframe
-    intervals.
+    Seeking only moves backward. It lands on the keyframe preceding a target, meaning
+    the target frame itself must be reached by decoding forward. Because the targets
+    ascend chronologically, one seek to the first target followed by a continuous
+    forward walk will reach all of them. This is much faster than seeking per target,
+    which would repeatedly decode the same keyframe intervals.
 
     Args:
         container: The open PyAV container.
@@ -232,9 +167,9 @@ def _seek_frames(container: Any, stream: Any, max_frames: int) -> List[Image.Ima
         max_frames: How many frames to sample.
 
     Returns:
-        The decoded frames in presentation order, returning one per target reached. This
-        returns an empty list if the clip reports no usable duration, which tells the
-        caller to use the sequential fallback method.
+        The decoded frames in presentation order, returning one per target reached.
+        This returns an empty list if the clip reports no usable duration. That tells
+        the caller to use the sequential fallback method.
     """
     duration = _stream_duration(stream, container)
     if duration is None or duration <= 0:
@@ -286,7 +221,7 @@ def _walk_frames(container: Any, stream: Any, max_frames: int) -> List[Image.Ima
         max_frames: How many frames to sample.
 
     Returns:
-        Up to `max_frames` decoded frames.
+        A list of up to `max_frames` decoded frames.
     """
     with contextlib.suppress(Exception):
         container.seek(0, stream=stream)
@@ -312,17 +247,17 @@ def _stream_duration(stream: Any, container: Any) -> Optional[int]:
 
     Args:
         stream: The video stream.
-        container: The container, which is consulted when the stream itself
-            does not report a duration.
+        container: The container which is consulted when the stream itself does not
+            report a duration.
 
     Returns:
-        The duration in `stream.time_base` units, or `None` if neither the
-        stream nor the container knows it.
+        The duration in `stream.time_base` units, or `None` if neither the stream nor
+        the container knows it.
     """
     if stream.duration is not None:
         return int(stream.duration)
     if container.duration is not None and stream.time_base:
-        # `container.duration` is in microseconds regardless of the stream's time base.
+        # `container.duration` is in microseconds regardless of the stream's time base
         return int(container.duration / 1_000_000 / stream.time_base)
     return None
 
@@ -335,7 +270,7 @@ def _to_rgb(image: Image.Image) -> Image.Image:
         image: An image in any mode.
 
     Returns:
-        The same image converted to RGB. Alpha channels are discarded rather
-        than composited onto a background, mirroring the browser pipeline.
+        The same image converted to RGB. Alpha channels are discarded rather than
+        composited onto a background.
     """
     return image if image.mode == "RGB" else image.convert("RGB")

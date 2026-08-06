@@ -3,7 +3,7 @@ name = "guard-local-detector"
 version = "0.0.1"
 description = "A local detection engine for the Guard Python client, integrating visual safety filters into your applications"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "AGPL-3.0-only"
 authors = [{ name = "Elhio" }]
 keywords = [
@@ -15,6 +15,11 @@ keywords = [
     "image-moderation",
     "video-moderation",
     "trust-and-safety",
+    "c2pa",
+    "content-credentials",
+    "provenance",
+    "exif",
+    "metadata",
     "computer-vision",
     "onnx",
     "on-device",
@@ -24,7 +29,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -40,6 +44,7 @@ dependencies = [
     "pillow>=10.4.0",
     "pillow-heif>=1.0.0",
     "av>=14.0.0",
+    "c2pa-python>=0.37.0",
 ]
 
 [project.urls]
@@ -69,7 +74,7 @@ addopts = ["--strict-markers", "--strict-config"]
 [tool.ruff]
 line-length = 88
 src = ["src", "tests"]
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.format]
 docstring-code-format = true
@@ -100,5 +105,5 @@ packages = ["guard_local"]
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["av", "av.*", "pillow_heif", "onnxruntime", "onnxruntime.*"]
+module = ["av", "av.*", "c2pa", "pillow_heif", "onnxruntime", "onnxruntime.*"]
 ignore_missing_imports = true

@@ -1,9 +1,11 @@
 """
 On-device media detection for the Guard Python client.
 
-Everything here is reached through `LocalDetectorEngine`. The Guard client looks
-it up on this package root, so it must stay exported from here, and importing this
-package must stay cheap, since no model is loaded until the first call.
+Everything here is reached through `LocalDetectorEngine`. This engine weighs three
+independent sources against each other: signed C2PA provenance, embedded metadata, and a
+vision model. The Guard client looks up the engine on this package root, so it must
+remain exported from here. Importing this package remains lightweight because neither
+the model nor the C2PA runtime is loaded until the first call that requires them.
 
 Quick start:
 
@@ -11,7 +13,7 @@ Quick start:
 import guard_local
 
 engine = guard_local.LocalDetectorEngine()
-engine.analyze(data, "image/jpeg") # doctest: +SKIP
+engine.analyze(data, "image/jpeg")  # doctest: +SKIP
 ```
 """
 
@@ -19,6 +21,13 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
+from .detection import (
+    DETECTION_THRESHOLDS,
+    CategoryResult,
+    Signal,
+    SignalMatch,
+    passes_threshold,
+)
 from .engine import LocalDetectorEngine
 from .exceptions import (
     GuardLocalError,
@@ -26,7 +35,7 @@ from .exceptions import (
     ModelLoadError,
     UnsupportedMediaError,
 )
-from .models import TASKS, Task
+from .tasks import TASKS, Task
 
 try:
     __version__ = version("guard-local-detector")
@@ -34,12 +43,17 @@ except PackageNotFoundError:  # pragma: running from an uninstalled checkout
     __version__ = "0.0.0+unknown"
 
 __all__ = [
+    "DETECTION_THRESHOLDS",
     "TASKS",
+    "CategoryResult",
     "GuardLocalError",
     "LocalDetectorEngine",
     "MediaDecodeError",
     "ModelLoadError",
+    "Signal",
+    "SignalMatch",
     "Task",
     "UnsupportedMediaError",
     "__version__",
+    "passes_threshold",
 ]
