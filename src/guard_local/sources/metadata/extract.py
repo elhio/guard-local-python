@@ -25,8 +25,9 @@ from guard_local.tasks import VIDEO_MEDIA_TYPES
 
 __all__ = ["RawImageMetadata", "extract_image_metadata"]
 
-# HEIC needs the same opener that the decoding path registers. Registering is idempotent,
-# so doing it here allows metadata to be read without ever loading the vision model.
+# HEIC needs the same opener that the decoding path registers. Registering is
+# idempotent, so doing it here allows metadata to be read without ever loading the
+# vision model.
 pillow_heif.register_heif_opener()
 
 #: A parsed file's segments keyed by the standard they came from. Missing segments are

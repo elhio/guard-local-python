@@ -22,7 +22,7 @@ __all__ = [
     "VIOLENT",
 ]
 
-#: The three moderation categories using the exact names expected by the browser extension.
+#: The three moderation categories.
 AI_GENERATED = "aiGenerated"
 VIOLENT = "violent"
 EXPLICIT = "explicit"

@@ -32,7 +32,8 @@ class CameraEvidence:
     Attributes:
         has_make_model: A known manufacturer names itself in the Make or Model field.
         has_lens: Lens or optical parameters are recorded.
-        has_capture_settings: Exposure mechanics such as shutter speed or aperture are present.
+        has_capture_settings: Exposure mechanics such as shutter speed or aperture are
+            present.
         has_gps: Real-world geographic coordinates are attached.
     """
 
