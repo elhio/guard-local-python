@@ -22,7 +22,7 @@ Before you start writing code, make sure your development environment is set up 
 
 0. Fork the repository to your own GitHub account.
 
-1. Install prerequisites: [uv](https://docs.astral.sh/uv/) and Python 3.9 or newer. You do not need to install Python 
+1. Install prerequisites: [uv](https://docs.astral.sh/uv/) and Python 3.10 or newer. You do not need to install Python 
 yourself — uv will fetch a suitable interpreter.
 
 2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/guard-local-python.git`
