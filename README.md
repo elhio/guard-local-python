@@ -1,6 +1,6 @@
 <div align="center">
   <h1>
-    <img src="./docs/guard.svg" width="100" alt="Guard Logo"><br>
+    <img src="https://raw.githubusercontent.com/elhio/guard-local-python/main/docs/guard.svg" width="100" alt="Guard Logo"><br>
     Guard Local Detector
   </h1>
   <p><em>A local detection engine for the Guard Python client, integrating visual safety filters into your applications</em></p>
@@ -126,9 +126,9 @@ This project uses [uv](https://docs.astral.sh/uv/) for lightning-fast Python pac
 ## Contributing
 
 We welcome contributions! Please note that all contributors must sign our automated CLA. Read more in our 
-[Contributing Guide](CONTRIBUTING.md).
+[Contributing Guide](https://github.com/elhio/guard-local-python/blob/main/CONTRIBUTING.md).
 
 ## License
 
 This repository and its corresponding PyPI package are licensed under the GNU Affero General Public License v3.0 
-(AGPL-3.0) - see the [LICENSE](LICENSE) file for details.
+(AGPL-3.0) - see the [LICENSE](https://github.com/elhio/guard-local-python/blob/main/LICENSE) file for details.
