@@ -5,6 +5,7 @@
   </h1>
   <p><em>A local detection engine for the Guard Python client, integrating visual safety filters into your applications</em></p>
   <p>
+    <a href="https://pypi.org/project/guard-local-detector/"><img src="https://img.shields.io/pypi/v/guard-local-detector.svg?label=Release" alt="Version"></a>
     <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg" alt="License: AGPL v3"></a>
     <a href="https://github.com/elhio/guard-local-python/fork"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>  
   </p>
