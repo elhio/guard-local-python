@@ -484,7 +484,7 @@ wheels = [
 
 [[package]]
 name = "guard-local-detector"
-version = "0.0.1rc1"
+version = "0.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "av", version = "17.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
