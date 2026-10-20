@@ -24,7 +24,7 @@ from guard_local.exceptions import (
     MediaDecodeError,
     UnsupportedMediaError,
 )
-from guard_local.tasks import (
+from guard_local.targets import (
     IMAGE_MEDIA_TYPES,
     SUPPORTED_MEDIA_TYPES,
     VIDEO_MEDIA_TYPES,

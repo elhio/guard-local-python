@@ -104,12 +104,12 @@ This package is small, but a few things in it are load-bearing in ways that are 
 between the two copies always means the contract changed. It is excluded from `ruff format` for the same reason. If it 
 fails, fix the engine.
 
-**The labels in `src/guard_local/models.py` are a public API.** The client derives each result's task id from 
+**The labels in `src/guard_local/targets.py` are a public API.** The client derives each result's task id from 
 `uuid5(namespace, label)`, so renaming a label silently changes the id that callers key on. They also mirror the tasks 
 the cloud API seeds, which is what lets someone test locally and then route to the cloud unchanged.
 
 **The preprocessing must match the browser extension.** Both run the same ONNX file, and the scores only agree because 
-the transform agrees down to the rounding. Before touching `src/guard_local/media_utils.py`, read 
+the transform agrees down to the rounding. Before touching `src/guard_local/sources/model/transform.py`, read 
 `src/lib/localModel/runner.ts` in `guard-browser-extension`. If a change is intentional, re-record the expected values 
 in `test_golden_scores_for_a_deterministic_image` and say in the PR why the scores moved.
 
