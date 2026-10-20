@@ -1,3 +1,12 @@
-{                                                                                                                                                                                                                                                                           
-  "signedContributors": []                                                                                                                                                                                                                                                  
+{
+  "signedContributors": [
+    {
+      "name": "stefan-scholz",
+      "id": 33206086,
+      "comment_id": 6287420952,
+      "created_at": "2026-10-20T09:03:43Z",
+      "repoId": 1302952179,
+      "pullRequestNo": 2
+    }
+  ]
 }
