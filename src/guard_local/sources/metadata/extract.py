@@ -21,7 +21,7 @@ from typing import Any, Dict, Optional
 import pillow_heif
 from PIL import ExifTags, Image, ImageFile, IptcImagePlugin
 
-from guard_local.tasks import VIDEO_MEDIA_TYPES
+from guard_local.targets import VIDEO_MEDIA_TYPES
 
 __all__ = ["RawImageMetadata", "extract_image_metadata"]
 

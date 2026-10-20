@@ -1,7 +1,7 @@
 """
 Scores pixels with the bundled multi-task vision model.
 
-The model is a FastViT-T8 with one head per task. Because each head is trained with
+The model is a FastViT-T8 with one head per target. Because each head is trained with
 `BCEWithLogits`, every output is an unbounded logit that requires a sigmoid activation
 to represent a probability. This is the only source that has an opinion about all three
 categories and the only one that must decode the media first. It is also the only source
@@ -18,7 +18,7 @@ from typing import Dict, FrozenSet, Optional, Sequence, Union
 import numpy as np
 
 from guard_local.detection import CategoryResult, SignalMatch, passes_threshold
-from guard_local.tasks import TASKS, VIDEO_MEDIA_TYPES
+from guard_local.targets import TARGETS, VIDEO_MEDIA_TYPES
 
 from .decode import load_frames
 from .session import ModelSession
@@ -78,7 +78,7 @@ class ModelSource:
 
     def analyze(self, data: bytes, media_type: str) -> Dict[str, CategoryResult]:
         """
-        Decode the media and score every frame against every task.
+        Decode the media and score every frame against every target.
 
         Args:
             data: The raw media bytes.
@@ -86,7 +86,7 @@ class ModelSource:
 
         Returns:
             One result per category. This always returns all three categories because
-            the model has an opinion about every task regardless of how confident it is.
+            the model has an opinion on every target regardless of how confident it is.
 
         Raises:
             ModelLoadError: If the model could not be found or loaded.
@@ -98,13 +98,13 @@ class ModelSource:
         frames = load_frames(data, media_type, max_frames=max_frames)
 
         session, input_name = self.session.ensure()
-        outputs = [task.output for task in TASKS]
+        outputs = [target.output for target in TARGETS]
         per_frame = [
             session.run(outputs, {input_name: to_tensor(frame)}) for frame in frames
         ]
 
         results: Dict[str, CategoryResult] = {}
-        for index, task in enumerate(TASKS):
+        for index, target in enumerate(TARGETS):
             score = self._aggregate(
                 [
                     _sigmoid(float(np.asarray(result[index]).reshape(-1)[0]))
@@ -112,23 +112,23 @@ class ModelSource:
                 ]
             )
             confidence = score * 100.0
-            results[task.category] = CategoryResult(
-                detected=passes_threshold(task.category, confidence),
+            results[target.category] = CategoryResult(
+                detected=passes_threshold(target.category, confidence),
                 # Kept as the probability the model produced rather than the whole
                 # percent the match displays. The browser extension rounds before
                 # comparing sources; comparing at full precision picks the same winner
                 # and spares the caller a rounding it never asked for.
                 confidence=confidence,
-                matches=[self._match(task.category, score)],
+                matches=[self._match(target.category, score)],
             )
         return results
 
     def _aggregate(self, scores: Sequence[float]) -> float:
         """
-        Combine the per-frame scores of a single task into the final model score.
+        Combine the per-frame scores of a single target into the final model score.
 
         Args:
-            scores: The probabilities calculated for every frame on a single task.
+            scores: The probabilities calculated for every frame on a single target.
 
         Returns:
             A probability between 0.0 and 1.0.

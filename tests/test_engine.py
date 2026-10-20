@@ -16,7 +16,7 @@ from guard_local.exceptions import (
     ModelLoadError,
     UnsupportedMediaError,
 )
-from guard_local.tasks import SUPPORTED_MEDIA_TYPES, TASKS
+from guard_local.targets import SUPPORTED_MEDIA_TYPES, TARGETS
 
 from .conftest import jpeg_bytes, png_bytes, png_with_text
 
@@ -55,14 +55,11 @@ class TestConstruction:
 
 
 class TestAnalyze:
-    def test_reports_every_task_in_a_stable_order(self, engine: Any) -> None:
+    def test_reports_every_target_in_a_stable_order(self, engine: Any) -> None:
         results = engine.analyze(png_bytes(), "image/png")
 
-        assert [entry["label"] for entry in results] == [task.label for task in TASKS]
         assert [entry["label"] for entry in results] == [
-            "AI-Generated",
-            "Violence",
-            "Explicit",
+            target.label for target in TARGETS
         ]
 
     def test_carries_the_cloud_descriptions(self, engine: Any) -> None:
@@ -77,16 +74,16 @@ class TestAnalyze:
             assert isinstance(entry["score"], float)
             assert 0.0 <= entry["score"] <= 1.0
 
-    def test_emits_no_task_id_so_the_client_derives_one(self, engine: Any) -> None:
+    def test_emits_no_target_id_so_the_client_derives_one(self, engine: Any) -> None:
         """
-        Ensure no task ID is emitted so the client derives it itself.
+        Ensure no target ID is emitted so the client derives it itself.
 
         Using a UUID5 hash of the label keeps IDs reproducible. Emitting
         an ID directly from the engine would only introduce noise.
         """
         results = engine.analyze(png_bytes(), "image/png")
 
-        assert all("task_id" not in entry for entry in results)
+        assert all("target_id" not in entry for entry in results)
 
     def test_the_same_bytes_score_the_same(self, engine: Any) -> None:
         data = jpeg_bytes()
@@ -122,7 +119,7 @@ class TestVideo:
     def test_a_clip_is_scored_across_frames(self, engine: Any, mp4: Any) -> None:
         results = engine.analyze(mp4, "video/mp4")
 
-        assert len(results) == len(TASKS)
+        assert len(results) == len(TARGETS)
         assert all(0.0 <= entry["score"] <= 1.0 for entry in results)
 
     def test_the_video_knobs_reach_the_model_source(self, mp4: Any) -> None:
@@ -230,7 +227,7 @@ class TestEvidenceMerging:
         assert results[0]["score"] == pytest.approx(0.25)
         assert results[0]["detected"] is False
 
-    def test_a_task_with_nothing_to_report_is_a_clean_zero(self) -> None:
+    def test_a_target_with_nothing_to_report_is_a_clean_zero(self) -> None:
         quiet = LocalDetectorEngine(use_model=False)
 
         violence = quiet.analyze(png_bytes(), "image/png")[1]
@@ -294,13 +291,13 @@ def test_golden_scores_for_a_deterministic_image(engine: Any) -> None:
     }
 
     assert results["AI-Generated"] == pytest.approx(GOLDEN["AI-Generated"], abs=1e-4)
-    assert results["Violence"] == pytest.approx(GOLDEN["Violence"], abs=1e-4)
+    assert results["Violent"] == pytest.approx(GOLDEN["Violent"], abs=1e-4)
     assert results["Explicit"] == pytest.approx(GOLDEN["Explicit"], abs=1e-4)
 
 
 #: Recorded from the bundled model; see the docstring above for why they are pinned.
 GOLDEN = {
     "AI-Generated": 0.257501,
-    "Violence": 0.000646,
+    "Violent": 0.000646,
     "Explicit": 0.033055,
 }

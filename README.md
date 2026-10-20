@@ -80,7 +80,7 @@ for item in results:
     print(f"{item['label']}: {item['score']:.2f}")
 
 # AI-Generated: 0.90
-# Violence: 0.02
+# Violent: 0.02
 # Explicit: 0.01
 ```
 

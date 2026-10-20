@@ -30,7 +30,7 @@ from .detection import CategoryResult, merge_category_results, passes_threshold
 from .exceptions import UnsupportedMediaError
 from .sources import C2paSource, MetadataSource, ModelSource, Source
 from .sources.model import AGGREGATORS
-from .tasks import SUPPORTED_MEDIA_TYPES, TASKS, Task
+from .targets import SUPPORTED_MEDIA_TYPES, TARGETS, Target
 
 __all__ = ["LocalDetectorEngine"]
 
@@ -128,7 +128,7 @@ class LocalDetectorEngine:
 
     def analyze(self, data: bytes, media_type: str) -> List[Dict[str, Any]]:
         """
-        Score media against every detection task.
+        Score media against every detection target.
 
         Args:
             data: The raw media bytes to analyze. Still images are scored as a
@@ -137,9 +137,9 @@ class LocalDetectorEngine:
             media_type: The MIME type of the media.
 
         Returns:
-            A list of results with one entry per task, always returned in the
+            A list of results with one entry per target, always returned in the
             same order. Each entry contains a `label`, a `score` representing a
-            probability from 0.0 to 1.0, a `description`, whether the task was
+            probability from 0.0 to 1.0, a `description`, whether the target was
             `detected`, and the `matches` that argued for it.
 
         Raises:
@@ -159,17 +159,17 @@ class LocalDetectorEngine:
             source.analyze(data, media_type) for source in self.sources
         )
 
-        return [self._report(task, found.get(task.category)) for task in TASKS]
+        return [self._report(target, found.get(target.category)) for target in TARGETS]
 
     @staticmethod
-    def _report(task: Task, evidence: Optional[CategoryResult]) -> Dict[str, Any]:
+    def _report(target: Target, evidence: Optional[CategoryResult]) -> Dict[str, Any]:
         """
-        Phrase the merged evidence of one category as a task result.
+        Phrase the merged evidence of one category as a target result.
 
         Args:
-            task: The task being reported.
+            target: The target being reported.
             evidence: What the sources found, or `None` when no source spoke to this
-                task's category.
+                target's category.
 
         Returns:
             One result entry with the `score` constrained to the unit interval.
@@ -181,9 +181,9 @@ class LocalDetectorEngine:
         matches = evidence.matches if evidence else []
 
         return {
-            "label": task.label,
+            "label": target.label,
             "score": min(1.0, max(0.0, confidence / 100.0)),
-            "description": task.description,
-            "detected": passes_threshold(task.category, confidence),
+            "description": target.description,
+            "detected": passes_threshold(target.category, confidence),
             "matches": [match.to_dict() for match in matches],
         }

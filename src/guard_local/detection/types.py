@@ -38,7 +38,7 @@ class Signal:
     Attributes:
         id: A stable identifier that is unique across every layer. Callers
             may branch on this, making it as much of a public API as the
-            task labels.
+            target labels.
         category: The category this signal evaluates.
         label: A short plain text name.
         description: An explanation of what the signal means and why it

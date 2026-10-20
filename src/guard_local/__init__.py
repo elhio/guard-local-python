@@ -35,7 +35,7 @@ from .exceptions import (
     ModelLoadError,
     UnsupportedMediaError,
 )
-from .tasks import TASKS, Task
+from .targets import TARGETS, Target
 
 try:
     __version__ = version("guard-local-detector")
@@ -44,7 +44,7 @@ except PackageNotFoundError:  # pragma: running from an uninstalled checkout
 
 __all__ = [
     "DETECTION_THRESHOLDS",
-    "TASKS",
+    "TARGETS",
     "CategoryResult",
     "GuardLocalError",
     "LocalDetectorEngine",
@@ -52,7 +52,7 @@ __all__ = [
     "ModelLoadError",
     "Signal",
     "SignalMatch",
-    "Task",
+    "Target",
     "UnsupportedMediaError",
     "__version__",
     "passes_threshold",
